@@ -7,183 +7,299 @@ class Scratch3SamLabs {
 
     constructor (runtime) {
         this.runtime = runtime;
-        this.device = null; // Store the BLE device
-        this.characteristic = null;
-        this.connectedDevices = [];
-        // UUID for the LEGO Technic Hub service
-        this.LEGO_SERVICE_UUID = '00001623-1212-efde-1623-785feabcd123';
-        // UUID for the characteristic to write commands
-        this.LEGO_CHARACTERISTIC_UUID = '00001624-1212-efde-1623-785feabcd123';
+        this.deviceMap = new Map(); // Store multiple devices
+        this.numberOfConnectedDevices = 0;
+        this.blocks = [
+            {
+                opcode: 'connectToDevice',
+                blockType: BlockType.COMMAND,
+                text: 'Connect to a block',
+                terminal: false
+            },
+            {
+                opcode: 'setLEDColor',
+                blockType: BlockType.COMMAND,
+                text: 'Set Block [num] Status Led Color: R[red], G[green], B[blue]',
+                terminal: false,
+                arguments: {
+                    num: {defaultValue: 0, type: ArgumentType.NUMBER },
+                    red: { defaultValue: 0, type: ArgumentType.NUMBER },
+                    green: { defaultValue: 0, type: ArgumentType.NUMBER },
+                    blue: { defaultValue: 0, type: ArgumentType.NUMBER }
+                }
+            },
+            {
+                opcode: 'setLEDRGBColor',
+                blockType: BlockType.COMMAND,
+                text: 'Set Block [num] RGB Led Color: R[red], G[green], B[blue]',
+                terminal: false,
+                arguments: {
+                    num: {defaultValue: 0, type: ArgumentType.NUMBER },
+                    red: { defaultValue: 0, type: ArgumentType.NUMBER },
+                    green: { defaultValue: 0, type: ArgumentType.NUMBER },
+                    blue: { defaultValue: 0, type: ArgumentType.NUMBER }
+                }
+            },
+            {
+                opcode: 'setBlockMotorSpeed',
+                blockType: BlockType.COMMAND,
+                text: 'Set Block [num] motor speed [val]',
+                terminal: false,
+                arguments: {
+                    num: {defaultValue: 0, type: ArgumentType.NUMBER },
+                    val: { defaultValue: 0, type: ArgumentType.NUMBER }
+                }
+            },
+            {
+                opcode: 'getSensorValue',
+                blockType: BlockType.REPORTER,
+                text: 'Sensor value, Block [num]',
+                terminal: false,
+                arguments: {
+                    num: {defaultValue: 0, type: ArgumentType.NUMBER }
+                }
+            },
+            {
+                opcode: 'getBattery',
+                blockType: BlockType.REPORTER,
+                text: 'Battery percentage, Block [num]',
+                terminal: false,
+                arguments: {
+                    num: {defaultValue: 0, type: ArgumentType.NUMBER }
+                }
+            }
+        ];
+
+        this.colors = [
+            "#FF00FF", "#00FFFF", "#FFFF00", "#808000",
+            "#FF0000", "#00FF00", "#0000FF"
+        ];
     }
 
+    hexToRgb(hex) {
+        hex = hex.replace(/^#/, ""); // Remove "#" if present
+        if (hex.length === 3) {
+            // Convert short hex (e.g. #F00) to full hex (#FF0000)
+            hex = hex.split("").map(c => c + c).join("");
+        }
+        let r = parseInt(hex.substring(0, 2), 16);
+        let g = parseInt(hex.substring(2, 4), 16);
+        let b = parseInt(hex.substring(4, 6), 16);
+        return { r, g, b };
+    }
+    
+    
     getInfo () {
         return {
             id: 'samlabsExtension',
             name: 'SamLabs',
-            color1: '#000099',
-            color2: '#660066',
-            
-            blocks: [
-                {
-                    opcode: 'myFirstBlock',
-                    blockType: BlockType.REPORTER,
-                    text: 'My first block [MY_NUMBER] and [MY_STRING]',
-                    terminal: false,
-                    arguments: {
-                        MY_NUMBER: {
-                            defaultValue: 123,
-                            type: ArgumentType.NUMBER
-                        },
-                        MY_STRING: {
-                            defaultValue: 'hello',
-                            type: ArgumentType.STRING
-                        }
-                    }
-                },
-                {
-                    opcode: 'connectToBLE',
-                    blockType: BlockType.COMMAND,
-                    text: 'Connect to BLE device',
-                    terminal: false,
-                },
-                {
-                    opcode: 'setLEDColor',
-                    blockType: BlockType.COMMAND,
-                    text: 'Set Hub Led Color: R[red], G[green], B[blue]',
-                    terminal: false,
-                    arguments: {
-                        red: {
-                            defaultValue: 0,
-                            type: ArgumentType.NUMBER
-                        },
-                        green: {
-                            defaultValue: 0,
-                            type: ArgumentType.NUMBER
-                        },
-                        blue: {
-                            defaultValue: 0,
-                            type: ArgumentType.NUMBER
-                        }
-                    }
-                }
-            ]
+            color1: '#0FBD8C',
+            color2: '#0DA57A',
+            blocks: this.blocks
         };
     }
 
-    myFirstBlock ({ MY_NUMBER, MY_STRING }) {
-        return MY_STRING + ' : doubled would be ' + (MY_NUMBER * 2);
+    addBlock(newBlock) {
+        this.blocks.push(newBlock);
+        this.runtime._refreshExtensions(); // Force a refresh of the extension
     }
 
-    async connectToBLE() {
+    async connectToDevice() {
         try {
+            // Request a Bluetooth device with the specified filter
             const device = await navigator.bluetooth.requestDevice({
-                filters: [{ services: [this.LEGO_SERVICE_UUID] }]
+                filters: [{
+                    namePrefix: 'SAM', // Filter by device name starting with 'SAM'
+                }],
+                optionalServices: [
+                    '0000180f-0000-1000-8000-00805f9b34fb',
+                    '3b989460-975f-11e4-a9fb-0002a5d5c51b'
+                ]
             });
-            this.device = device;
 
+            console.log('Device found:', device);
+
+            device.addEventListener('gattserverdisconnected', () => this.onDisconnected(device));
+
+            // Connect to the GATT server
             const server = await device.gatt.connect();
-            const service = await server.getPrimaryService(this.LEGO_SERVICE_UUID);
-            const characteristic = await service.getCharacteristic(this.LEGO_CHARACTERISTIC_UUID);
-            this.characteristic = characteristic;
+            console.log('Connected to GATT server');
 
-            // Enable notifications
-            await characteristic.startNotifications();
-            characteristic.addEventListener('characteristicvaluechanged', this.handleNotifications.bind(this));
+            await this.setupGATTDevice(server, device);
 
-            console.log('Connected to LEGO Technic Hub');
         } catch (error) {
-            console.error('Connection failed', error);
+            console.log('Error:', error);
         }
     }
 
-    async setLEDColor (red, green, blue) {
-        let port = this.getPortOfDeviceType(23);
-        if (port == -1)
+    async setupGATTDevice(server, device)
+    {
+        const num = this.numberOfConnectedDevices;
+        this.numberOfConnectedDevices++;
+        // Get the Battery Service
+        const battServ = await server.getPrimaryService('0000180f-0000-1000-8000-00805f9b34fb');
+        console.log('Battery Service found:', battServ);
+
+        // Get the Battery Level Characteristic
+        const batteryLevelCharacteristic = await battServ.getCharacteristic('00002a19-0000-1000-8000-00805f9b34fb');
+        console.log('Battery Level Characteristic found:', batteryLevelCharacteristic);
+
+        const SAMServ = await server.getPrimaryService('3b989460-975f-11e4-a9fb-0002a5d5c51b');
+
+        var SAMSensorCharacteristic = null;
+        var SensorAvailable = true;
+
+        try{
+            SAMSensorCharacteristic = await SAMServ.getCharacteristic('4c592e60-980c-11e4-959a-0002a5d5c51b');
+        } catch (error) {
+            console.log('Sensor characteristic not found');
+            SensorAvailable = false;
+        }
+        var SAMActorCharacteristic = null;
+        var ActorAvailable = true;
+
+        try{
+            SAMActorCharacteristic = await SAMServ.getCharacteristic('84fc1520-980c-11e4-8bed-0002a5d5c51b');
+        } catch (error) {
+            console.log('Actor characteristic not found');
+            ActorAvailable = false;
+        }
+
+        const SAMStatusLEDCharacteristic = await SAMServ.getCharacteristic('5baab0a0-980c-11e4-b5e9-0002a5d5c51b');
+
+        let block = { 
+            num: num,
+            device: device, 
+            battReadNotifyCharacteristic: batteryLevelCharacteristic,
+            SAMSensorCharacteristic: SAMSensorCharacteristic,
+            SensorAvailable: SensorAvailable,
+            ActorAvailable: ActorAvailable,
+            SAMActorCharacteristic: SAMActorCharacteristic,
+            SAMStatusLEDCharacteristic:SAMStatusLEDCharacteristic,
+            value: 0,
+            battery: 0};
+
+        this.deviceMap.set(num,block);
+        this.setBlockLedColor(block, this.hexToRgb(this.colors[num]));
+
+        if (SensorAvailable)
         {
-            console.log("Hub led not found");
+            await SAMSensorCharacteristic.startNotifications();
+            SAMSensorCharacteristic.addEventListener('characteristicvaluechanged', this.handleSensorNotifications.bind(this, num));
+        }    
+        
+        await batteryLevelCharacteristic.startNotifications();
+        batteryLevelCharacteristic.addEventListener('characteristicvaluechanged', this.handleBattChange.bind(this, num));
+    
+
+        console.log(`Connected to ${device.name || 'Unknown Device'}, num ${num}`);
+    }
+
+    async reconnect(device) {
+        try {
+            console.log('Reconnecting to device...');
+            const server = await device.gatt.connect();
+            console.log('Reconnected to GATT server');
+            this.setupGATTDevice(server, device);
+        } catch (error) {
+            console.log('Reconnection failed:', error);
+            setTimeout(() => this.reconnect(device), 5000); // Retry after 5 seconds
+        }
+    }
+    
+    onDisconnected(event) {
+        this.reconnect(event.target);
+    }
+
+    handleSensorNotifications(num, event) {
+        const value = event.target.value;
+        let device = this.deviceMap.get(num);
+        device.value = value.getUint8(0);
+    }
+
+    handleBattChange(num, event)
+    {
+        const value = event.target.value;
+        let device = this.deviceMap.get(num);
+        device.battery = value.getUint8(0);
+    }
+
+    async setLEDColor(args)
+    {
+        const num = Number(args.num);
+        const block = this.deviceMap.get(num);
+        if (!block)
+        {
             return;
         }
-        const setRGBmode = new Uint8Array([
-            0x41, port, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00
-        ]);
-        const setColor = new Uint8Array([
-            0x81, port, 0x11, 0x51,  0x01, red, green, blue // RGB values
-        ]);
+        await this.setBlockLedColor(block, { r: args.red, g: args.green, b: args.blue });
+    }
     
-        try {
-            await this.writeMessage(setRGBmode);
-            await this.writeMessage(setColor);
-            console.log('LED color set');
-        } catch (error) {
-            console.error('Failed to set LED color', error);
-        }
-    }
-
-    async writeMessage(msg)
+    async setBlockLedColor(block, color)
     {
-        const message = new Uint8Array([msg.length + 2, 0, ...msg]);
-        await this.characteristic.writeValue(message);
+        let message = new Uint8Array([
+            color.r,
+            color.g,
+            color.b
+        ]);
+        await block.SAMStatusLEDCharacteristic.writeValue(message);
     }
 
-    handleNotifications(event) {
-        const value = event.target.value;
-        let receivedData = [];
-        for (let i = 0; i < value.byteLength; i++) {
-            receivedData.push(value.getUint8(i));
-        }
-        console.log('Received notification:', receivedData);
-        if (receivedData[2] == 4)
+    async setLEDRGBColor(args)
+    {
+        const num = Number(args.num);
+        const block = this.deviceMap.get(num);
+        if (!block)
         {
-            //HUB attached/detached IO
-            const port = receivedData[3];
-
-            if (receivedData[4] != 0)
-            {
-                this.registerPortDevice(port, receivedData[5]);
-            }
-            else
-            {
-                this.deregisterPortDevice(port);
-            }
+            return;
         }
+
+        let message = new Uint8Array([
+            args.red,
+            args.green,
+            args.blue
+        ]);
+        await block.SAMActorCharacteristic.writeValue(message);
     }
 
-    registerPortDevice(port, deviceType)
+    async setBlockMotorSpeed(args)
     {
-        let device = { port: port, type: deviceType};
-        console.log("Register device:");
-        console.log(device);
-        this.connectedDevices.push(device);
-    }
-
-    deregisterPortDevice(port)
-    {
-        for (var i = 0; i < this.connectedDevices.length; i++)
+        const block = this.deviceMap.get(Number(args.num));
+        if (!block)
         {
-            if (this.connectedDevices[i].port == port)
-            {
-                console.log("deregister device:");
-                console.log(this.connectedDevices[i]);
-                this.connectedDevices.splice(i, 1);
-                break;
-            }
+            return;
         }
+        let speed = Number(args.val)
+        if (speed < 0)
+        {
+            speed = Math.abs(speed) * 1.27 + 128
+        }
+        else
+        {
+            speed = speed * 1.27
+        }
+        let message = new Uint8Array([speed]);
+        await block.SAMActorCharacteristic.writeValue(message);
     }
 
-    getPortOfDeviceType(type)
+    getSensorValue(args)
     {
-        console.log("finding device type: " + type);
-        console.log(this.connectedDevices);
-        for (var i = 0; i < this.connectedDevices.length; i++)
+        const block = this.deviceMap.get(Number(args.num));
+        if (!block)
         {
-            if (this.connectedDevices[i].type == type)
-            {
-                console.log("device:");
-                console.log(this.connectedDevices[i]);
-                return this.connectedDevices[i].port;
-            }
+            return 0;
         }
-        return -1;
+        return block.value;
+    }
+
+    getBattery(args)
+    {
+        const block = this.deviceMap.get(Number(args.num));
+        if (!block)
+        {
+            return 0;
+        }
+        return block.battery;
     }
 }
 
