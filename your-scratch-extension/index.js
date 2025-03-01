@@ -68,7 +68,7 @@ class SamLabsBlock {
         try {
             this._ble = new BLE(this._runtime, this._extensionId, {
                 filters: [{
-                    //namePrefix: 'SAM',
+                    // namePrefix: 'SAM',
                     //services: [SamLabsBLE.battServ, SamLabsBLE.SAMServ],
                 }],
                 optionalServices: []
