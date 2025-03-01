@@ -1,7 +1,166 @@
 const BlockType = require('../../extension-support/block-type');
 const ArgumentType = require('../../extension-support/argument-type');
-const TargetType = require('../../extension-support/target-type');
+const BLE = require('../../io/ble');
+const Base64Util = require('../../util/base64-util');
 require('regenerator-runtime/runtime');
+
+const SamLabsBLE = {
+    battServ: '0000180f-0000-1000-8000-00805f9b34fb',
+    batteryLevelCharacteristic: '00002a19-0000-1000-8000-00805f9b34fb',
+    SAMServ: '3b989460-975f-11e4-a9fb-0002a5d5c51b',
+    SensorCharacteristic: '4c592e60-980c-11e4-959a-0002a5d5c51b',
+    ActorCharacteristic: '84fc1520-980c-11e4-8bed-0002a5d5c51b',
+    StatusLedCharacteristic: '5baab0a0-980c-11e4-b5e9-0002a5d5c51b'
+}
+
+class SamLabsBlock {
+    constructor (runtime, extensionId, num) {
+        this._runtime = runtime;
+        this._runtime.on('PROJECT_STOP_ALL', this.stopAll.bind(this));
+        this._extensionId = extensionId;
+        this._ble = null;
+        this._runtime.registerPeripheralExtension(extensionId, this);
+        this.reset = this.reset.bind(this);
+        this._onConnect = this._onConnect.bind(this);
+        this._pingDevice = this._pingDevice.bind(this);
+        this.num = num;
+        this.value = 0;
+        this.battery = 0;
+        this.ActorAvailable = false;
+        this.SensorAvailable = false;
+    }
+
+    getBattery()
+    {
+        return this.battery;
+    }
+
+    getSensorValue()
+    {
+        return this.value;
+    }
+
+    setStatusLed(inputRGB) {
+        const message = new Uint8Array([
+            (inputRGB >> 16) & 0x000000FF,
+            (inputRGB >> 8) & 0x000000FF,
+            (inputRGB) & 0x000000FF
+        ]);
+        this.send(SamLabsBLE.StatusLedCharacteristic, message);
+    }
+
+    sendActorValue(val)
+    {
+        this.send(SamLabsBLE.ActorCharacteristic, new Uint8Array([val]));
+    }
+
+    stopAll()
+    {
+        if (!this.isConnected()) return;
+        if (!this.ActorAvailable) return;
+        this.send(SamLabsBLE.ActorCharacteristic, new Uint8Array([0]));
+    }
+
+    scan () {
+        if (this._ble) {
+            this._ble.disconnect();
+        }
+        try {
+            this._ble = new BLE(this._runtime, this._extensionId, {
+                filters: [{
+                    //namePrefix: 'SAM',
+                    //services: [SamLabsBLE.battServ, SamLabsBLE.SAMServ],
+                }],
+                optionalServices: []
+            }, this._onConnect, this.reset);
+        } catch (error) {
+            console.error("Failed to initialize BLE:", error);
+        }
+    }
+
+    connect (id) {
+        if (this._ble) {
+            this._ble.connectPeripheral(id);
+        }
+    }
+
+    disconnect () {
+        if (this._ble) {
+            this._ble.disconnect();
+        }
+
+        this.reset();
+    }
+    reset () {
+        this.ActorAvailable = false;
+        this.SensorAvailable = false;
+    }
+    isConnected () {
+        let connected = false;
+        if (this._ble) {
+            connected = this._ble.isConnected();
+        }
+        return connected;
+    }
+    send (uuid, message) {
+        if (!this.isConnected()) return Promise.resolve();
+
+        return this._ble.write(
+            SamLabsBLE.SAMServ,
+            uuid,
+            Base64Util.uint8ArrayToBase64(message),
+            'base64'
+        );
+    }
+    getCharacteristics (serviceId) {
+        return this._ble.sendRemoteRequest('getCharacteristics', { serviceId })
+            .then(response => response.characteristics)
+            .catch(e => {
+                this._ble.handleDisconnectError(e);
+                return [];
+            });
+    }
+    _onConnect () {
+        this.getCharacteristics(SamLabsBLE.SAMServ)
+        .then(characteristics => {
+            console.log('Characteristics: ', characteristics)
+            this.SensorAvailable = characteristics.some(c => c.id === SamLabsBLE.SensorCharacteristic);
+            this.ActorAvailable = characteristics.some(c => c.id === SamLabsBLE.ActorCharacteristic);
+            console.log(`Characteristic ${SamLabsBLE.SensorCharacteristic} available:`, this.SensorAvailable);
+            console.log(`Characteristic ${SamLabsBLE.ActorCharacteristic} available:`, this.ActorAvailable);
+        });
+
+        if (this.SensorAvailable) {
+            this._ble.startNotifications(
+                SamLabsBLE.SAMServ,
+                SamLabsBLE.SensorCharacteristic,
+                this._onMessage.bind(this, SamLabsBLE.SensorCharacteristic)
+            );
+        }
+
+        this._ble.startNotifications(
+            SamLabsBLE.battServ,
+            SamLabsBLE.batteryLevelCharacteristic,
+            this._onMessage.bind(this, SamLabsBLE.batteryLevelCharacteristic)
+        );
+
+    }
+    _onMessage (characteristics, base64)
+    {
+        const data = Base64Util.base64ToUint8Array(base64);
+        if (characteristics == SamLabsBLE.SensorCharacteristic)
+        {
+            this.value = data[0];
+        }
+        else
+        {
+            this.battery = data[0];
+        }
+    }
+    _pingDevice () 
+    {
+    }
+}
 
 class Scratch3SamLabs {
 
@@ -9,6 +168,8 @@ class Scratch3SamLabs {
         this.runtime = runtime;
         this.deviceMap = new Map(); // Store multiple devices
         this.numberOfConnectedDevices = 0;
+        this.extensionId = 'samlabsExtension';
+        this.device = new SamLabsBlock(runtime, this.extensionId);
         this.blocks = [
             {
                 opcode: 'connectToDevice',
@@ -91,8 +252,9 @@ class Scratch3SamLabs {
     
     getInfo () {
         return {
-            id: 'samlabsExtension',
+            id: this.extensionId,
             name: 'SamLabs',
+            showStatusButton: true,
             color1: '#0FBD8C',
             color2: '#0DA57A',
             blocks: this.blocks
