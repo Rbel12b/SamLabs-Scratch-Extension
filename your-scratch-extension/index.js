@@ -68,10 +68,10 @@ class SamLabsBlock {
         try {
             this._ble = new BLE(this._runtime, this._extensionId, {
                 filters: [{
-                    //namePrefix: 'SAM',
-                    //services: [SamLabsBLE.battServ, SamLabsBLE.SAMServ],
+                    namePrefix: 'SAM',
+                    services: [SamLabsBLE.SAMServ],
                 }],
-                optionalServices: []
+                optionalServices: [SamLabsBLE.battServ]
             }, this._onConnect, this.reset);
         } catch (error) {
             console.error("Failed to initialize BLE:", error);
