@@ -282,9 +282,12 @@ class Scratch3SamLabs {
     }
 
     stopAll() {
-        this.deviceMap.forEach(device => {
-            this.setLEDRGBColor({num: device.num, red: 0, green: 0, blue: 0});
-        })
+        this.deviceMap.forEach(stopDevice.bind(this));
+    }
+
+    stopDevice(num)
+    {
+        this.setLEDRGBColor({num: num, red: 0, green: 0, blue: 0});
     }
 
     async connectToDevice() {
