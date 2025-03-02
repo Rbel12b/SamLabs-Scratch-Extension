@@ -17,11 +17,11 @@ index ba18b91..e316f38 100644
  
  export default [
 +    {
-+        name: 'Your Extension',
++        name: 'SamLabs',
 +        extensionId: 'yourScratchExtension',
 +        iconURL: yourExtensionIconURL,
 +        insetIconURL: yourExtensionInsetIconURL,
-+        description: 'Your custom Scratch extension',
++        description: 'Control SamLabs blocks',
 +        featured: true,
 +        disabled: false
 +    },
