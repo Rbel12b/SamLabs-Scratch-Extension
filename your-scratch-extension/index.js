@@ -282,7 +282,7 @@ class Scratch3SamLabs {
     }
 
     stopAll() {
-        this.deviceMap.forEach(stopDevice.bind(this));
+        this.deviceMap.forEach(this.stopDevice.bind(this));
     }
 
     stopDevice(num)
