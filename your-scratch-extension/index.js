@@ -268,7 +268,7 @@ class Scratch3SamLabs {
         return {
             id: this.extensionId,
             name: 'SamLabs',
-            showStatusButton: true,
+            showStatusButton: false,
             color1: '#0FBD8C',
             color2: '#0DA57A',
             blocks: this.blocks
