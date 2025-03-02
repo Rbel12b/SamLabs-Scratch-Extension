@@ -69,9 +69,9 @@ class SamLabsBlock {
             console.log("Starting BLE scan...");
             this._ble = new BLE(this._runtime, this._extensionId, {
                 acceptAllDevices: true,
-                filters: [{
-                    namePrefix: 'SAM',
-                }],
+                //filters: [{
+                //    namePrefix: 'SAM',
+                //}],
                 //optionalServices: [SamLabsBLE.battServ, SamLabsBLE.SAMServ]
             }, this._onConnect, this.reset);
             console.log(this._ble._socket);
