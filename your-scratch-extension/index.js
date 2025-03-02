@@ -72,7 +72,7 @@ class SamLabsBlock {
                 filters: [{
                     namePrefix: 'SAM',
                 }],
-                //optionalServices: [SamLabsBLE.battServ, SamLabsBLE.SAMServ]
+                // optionalServices: [SamLabsBLE.battServ, SamLabsBLE.SAMServ]
             }, this._onConnect, this.reset);
             console.log(this._ble._socket);
             console.log("BLE scan initialized.");
