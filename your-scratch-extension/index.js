@@ -173,7 +173,7 @@ class Scratch3SamLabs {
         this.deviceMap = new Map(); // Store multiple devices
         this.numberOfConnectedDevices = 0;
         this.extensionId = 'samlabsExtension';
-        this._runtime.on('PROJECT_STOP_ALL', this.stopAll.bind(this));
+        this.runtime.on('PROJECT_STOP_ALL', this.stopAll.bind(this));
         //this.device = new SamLabsBlock(runtime, this.extensionId);
         this.blocks = [
             {
