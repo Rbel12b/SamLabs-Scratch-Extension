@@ -216,6 +216,16 @@ class Scratch3SamLabs {
                 }
             },
             {
+                opcode: 'setBlockServo',
+                blockType: BlockType.COMMAND,
+                text: 'Set Block [num] Servo angle [val]°',
+                terminal: false,
+                arguments: {
+                    num: {defaultValue: 0, type: ArgumentType.NUMBER },
+                    val: { defaultValue: 0, type: ArgumentType.NUMBER }
+                }
+            },
+            {
                 opcode: 'getSensorValue',
                 blockType: BlockType.REPORTER,
                 text: 'Sensor value, Block [num]',
@@ -402,7 +412,7 @@ class Scratch3SamLabs {
     {
         const num = Number(args.num);
         const block = this.deviceMap.get(num);
-        if (!block)
+        if (!block || !block.ActorAvailable)
         {
             return;
         }
@@ -418,7 +428,7 @@ class Scratch3SamLabs {
     async setBlockMotorSpeed(args)
     {
         const block = this.deviceMap.get(Number(args.num));
-        if (!block)
+        if (!block || !block.ActorAvailable)
         {
             return;
         }
@@ -431,6 +441,17 @@ class Scratch3SamLabs {
         {
             speed = speed * 1.27
         }
+        let message = new Uint8Array([speed]);
+        await block.SAMActorCharacteristic.writeValue(message);
+    }
+
+    async setBlockServo(args) {
+        const block = this.deviceMap.get(Number(args.num));
+        if (!block || !block.ActorAvailable)
+        {
+            return;
+        }
+        let speed = Number(args.val)
         let message = new Uint8Array([speed]);
         await block.SAMActorCharacteristic.writeValue(message);
     }
