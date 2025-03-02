@@ -173,6 +173,7 @@ class Scratch3SamLabs {
         this.deviceMap = new Map(); // Store multiple devices
         this.numberOfConnectedDevices = 0;
         this.extensionId = 'samlabsExtension';
+        this._runtime.on('PROJECT_STOP_ALL', this.stopAll.bind(this));
         //this.device = new SamLabsBlock(runtime, this.extensionId);
         this.blocks = [
             {
@@ -278,6 +279,12 @@ class Scratch3SamLabs {
     addBlock(newBlock) {
         this.blocks.push(newBlock);
         this.runtime._refreshExtensions(); // Force a refresh of the extension
+    }
+
+    stopAll() {
+        this.deviceMap.forEach(device => {
+            this.setLEDRGBColor({num: device.num, red: 0, green: 0, blue: 0});
+        })
     }
 
     async connectToDevice() {
