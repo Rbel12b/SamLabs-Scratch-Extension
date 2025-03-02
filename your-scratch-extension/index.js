@@ -12,7 +12,7 @@ const SamLabsBLE = {
     ActorCharacteristic: '84fc1520-980c-11e4-8bed-0002a5d5c51b',
     StatusLedCharacteristic: '5baab0a0-980c-11e4-b5e9-0002a5d5c51b'
 }
-
+/*
 class SamLabsBlock {
     constructor (runtime, extensionId, num) {
         this._runtime = runtime;
@@ -28,6 +28,7 @@ class SamLabsBlock {
         this.battery = 0;
         this.ActorAvailable = false;
         this.SensorAvailable = false;
+        console.log(this._runtime);
     }
 
     getBattery()
@@ -72,7 +73,7 @@ class SamLabsBlock {
                 filters: [{
                     namePrefix: 'SAM',
                 }],
-                //optionalServices: [SamLabsBLE.battServ, SamLabsBLE.SAMServ]
+                optionalServices: [SamLabsBLE.battServ, SamLabsBLE.SAMServ]
             }, this._onConnect, this.reset);
             console.log(this._ble._socket);
             console.log("BLE scan initialized.");
@@ -163,7 +164,7 @@ class SamLabsBlock {
     _pingDevice () 
     {
     }
-}
+}*/
 
 class Scratch3SamLabs {
 
@@ -172,7 +173,7 @@ class Scratch3SamLabs {
         this.deviceMap = new Map(); // Store multiple devices
         this.numberOfConnectedDevices = 0;
         this.extensionId = 'samlabsExtension';
-        this.device = new SamLabsBlock(runtime, this.extensionId);
+        //this.device = new SamLabsBlock(runtime, this.extensionId);
         this.blocks = [
             {
                 opcode: 'connectToDevice',
