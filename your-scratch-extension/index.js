@@ -288,8 +288,8 @@ class Scratch3SamLabs {
                     namePrefix: 'SAM', // Filter by device name starting with 'SAM'
                 }],
                 optionalServices: [
-                    '0000180f-0000-1000-8000-00805f9b34fb',
-                    '3b989460-975f-11e4-a9fb-0002a5d5c51b'
+                    SamLabsBLE.battServ,
+                    SamLabsBLE.SAMServ
                 ]
             });
 
@@ -313,20 +313,20 @@ class Scratch3SamLabs {
         const num = this.numberOfConnectedDevices;
         this.numberOfConnectedDevices++;
         // Get the Battery Service
-        const battServ = await server.getPrimaryService('0000180f-0000-1000-8000-00805f9b34fb');
+        const battServ = await server.getPrimaryService(SamLabsBLE.battServ);
         console.log('Battery Service found:', battServ);
 
         // Get the Battery Level Characteristic
-        const batteryLevelCharacteristic = await battServ.getCharacteristic('00002a19-0000-1000-8000-00805f9b34fb');
+        const batteryLevelCharacteristic = await battServ.getCharacteristic(SamLabsBLE.batteryLevelCharacteristic);
         console.log('Battery Level Characteristic found:', batteryLevelCharacteristic);
 
-        const SAMServ = await server.getPrimaryService('3b989460-975f-11e4-a9fb-0002a5d5c51b');
+        const SAMServ = await server.getPrimaryService(SamLabsBLE.SAMServ);
 
         var SAMSensorCharacteristic = null;
         var SensorAvailable = true;
 
         try{
-            SAMSensorCharacteristic = await SAMServ.getCharacteristic('4c592e60-980c-11e4-959a-0002a5d5c51b');
+            SAMSensorCharacteristic = await SAMServ.getCharacteristic(SamLabsBLE.SensorCharacteristic);
         } catch (error) {
             console.log('Sensor characteristic not found');
             SensorAvailable = false;
@@ -335,13 +335,13 @@ class Scratch3SamLabs {
         var ActorAvailable = true;
 
         try{
-            SAMActorCharacteristic = await SAMServ.getCharacteristic('84fc1520-980c-11e4-8bed-0002a5d5c51b');
+            SAMActorCharacteristic = await SAMServ.getCharacteristic(SamLabsBLE.ActorCharacteristic);
         } catch (error) {
             console.log('Actor characteristic not found');
             ActorAvailable = false;
         }
 
-        const SAMStatusLEDCharacteristic = await SAMServ.getCharacteristic('5baab0a0-980c-11e4-b5e9-0002a5d5c51b');
+        const SAMStatusLEDCharacteristic = await SAMServ.getCharacteristic(SamLabsBLE.StatusLedCharacteristic);
 
         let block = { 
             num: num,
