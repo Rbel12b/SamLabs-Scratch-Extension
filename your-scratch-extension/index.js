@@ -66,12 +66,16 @@ class SamLabsBlock {
             this._ble.disconnect();
         }
         try {
+            console.log("Starting BLE scan...");
             this._ble = new BLE(this._runtime, this._extensionId, {
+                acceptAllDevices: false,
                 filters: [{
-                    namePrefix: 'SAM'
+                    namePrefix: 'SAM',
                 }],
-                optionalServices: [SamLabsBLE.battServ, SamLabsBLE.SAMServ]
+                //optionalServices: [SamLabsBLE.battServ, SamLabsBLE.SAMServ]
             }, this._onConnect, this.reset);
+            console.log(this._ble._socket);
+            console.log("BLE scan initialized.");
         } catch (error) {
             console.error("Failed to initialize BLE:", error);
         }
@@ -355,21 +359,8 @@ class Scratch3SamLabs {
 
         console.log(`Connected to ${device.name || 'Unknown Device'}, num ${num}`);
     }
-
-    async reconnect(device) {
-        try {
-            console.log('Reconnecting to device...');
-            const server = await device.gatt.connect();
-            console.log('Reconnected to GATT server');
-            this.setupGATTDevice(server, device);
-        } catch (error) {
-            console.log('Reconnection failed:', error);
-            setTimeout(() => this.reconnect(device), 5000); // Retry after 5 seconds
-        }
-    }
     
     onDisconnected(event) {
-        this.reconnect(event.target);
     }
 
     handleSensorNotifications(num, event) {
